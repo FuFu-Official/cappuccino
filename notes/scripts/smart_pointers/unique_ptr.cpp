@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -33,7 +34,7 @@ int main() {
   auto myMaps1 = std::make_unique<MyMap[]>(5);
 
   // Inistialize the array of unique_ptr
-  for (int i = 0; i < 5; ++i) {
+  for (size_t i = 0; i < 5; ++i) {
     myMaps1[i] = MyMap("key" + std::to_string(i), "value" + std::to_string(i));
   }
 
@@ -52,7 +53,7 @@ int main() {
 
   // Pass by reference to avoid copying unique_ptr
   for (const auto &map : myMaps2) {
-    // map->print();
+    map->print();
   }
 
   return 0;

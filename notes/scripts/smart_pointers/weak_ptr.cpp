@@ -40,9 +40,9 @@ void RunTest() {
 
   // Each controller depends on all others not being deleted.
   // Give each controller a pointer to all the others.
-  for (int i = 0; i < v.size(); ++i) {
+  for (unsigned long i = 0; i < v.size(); ++i) {
     std::for_each(v.begin(), v.end(), [&v, i](std::shared_ptr<Controller> p) {
-      if (p->Num != i) {
+      if (p->Num != static_cast<int>(i)) {
         v[i]->others.push_back(std::weak_ptr<Controller>(p));
         std::cout << "push_back to v[" << i << "]: " << p->Num << std::endl;
       }
