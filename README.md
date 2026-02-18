@@ -27,7 +27,7 @@
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠘⠁⠐⠂⠐⠐⠂⠐⠒⠚⠃⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ```
 
-**Compile Flags**
+- **Compile Flags**
 
 ```sh
 -Wall -Wextra -Weffc++
