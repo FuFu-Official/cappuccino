@@ -1,10 +1,12 @@
 #include "print.hpp"
 #include <charconv>
+#include <cstddef>
 #include <regex>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -19,25 +21,25 @@ struct JSONObject {
                >
       inner;
 
-  void do_print() const { print(inner); }
+  void do_print() const { printnl(inner); }
 };
-
-JSONObject parse(std::string_view json);
 
 char unescaped_char(char c);
 
 template <class T> std::optional<T> try_parse_num(std::string_view str);
 
+std::pair<JSONObject, size_t> parse(std::string_view json);
+
 int main() {
-  std::string_view str = R"JSON("\n")JSON";
-  print(parse(str));
+  std::string_view str = R"JSON([1,[1,3,    "hellp"          ],5])JSON";
+  print(parse(str).first);
   return 0;
 }
 
-JSONObject parse(std::string_view json) {
+std::pair<JSONObject, size_t> parse(std::string_view json) {
   // Parse none
   if (json.empty()) {
-    return JSONObject{std::monostate{}};
+    return {JSONObject{std::monostate{}}, 0};
   }
 
   // Parse int & double
@@ -48,11 +50,11 @@ JSONObject parse(std::string_view json) {
                           num_regex)) {
       std::string str = match.str();
       if (auto num = try_parse_num<int>(str); num.has_value()) {
-        return JSONObject{num.value()};
+        return {JSONObject{num.value()}, str.size()};
       }
 
       if (auto num = try_parse_num<double>(str); num.has_value()) {
-        return JSONObject{num.value()};
+        return {JSONObject{num.value()}, str.size()};
       }
     }
   }
@@ -83,12 +85,82 @@ JSONObject parse(std::string_view json) {
       }
     }
 
-    return JSONObject{std::move(str)};
+    return {JSONObject{std::move(str)}, i};
   }
 
-  // TODO: Parse List
+  auto skip_whitespace = [&json](size_t &i) {
+    while (i < json.size() &&
+           std::isspace(static_cast<unsigned char>(json[i]))) {
+      ++i;
+    }
+  };
 
-  return JSONObject{std::monostate{}};
+  // Parse list
+  if (json[0] == '[') {
+    std::vector<JSONObject> res;
+    size_t i;
+    for (i = 1; i < json.size();) {
+      if (json[i] == ']') {
+        i += 1;
+        break;
+      }
+      auto [obj, eaten] = parse(json.substr(i));
+      if (eaten == 0) {
+        i = 0;
+        break;
+      }
+      res.push_back(std::move(obj));
+      i += eaten;
+
+      skip_whitespace(i);
+      if (json[i] == ',') {
+        i += 1;
+      }
+      skip_whitespace(i);
+    }
+    return {JSONObject{std::move(res)}, i};
+  }
+
+  // Parse dict
+  if (json[0] == '{') {
+    std::unordered_map<std::string, JSONObject> res;
+    size_t i;
+    for (i = 1; i < json.size();) {
+      if (json[i] == '}') {
+        i += 1;
+        break;
+      }
+      auto [keyobj, keyeaten] = parse(json.substr(i));
+      if (keyeaten == 0) {
+        i = 0;
+        break;
+      }
+      i += keyeaten;
+      if (!std::holds_alternative<std::string>(keyobj.inner)) {
+        i = 0;
+        break;
+      }
+      if (json[i] == ':') {
+        i += 1;
+      }
+      std::string key = std::move(std::get<std::string>(keyobj.inner));
+      auto [valobj, valeaten] = parse(json.substr(i));
+      if (valeaten == 0) {
+        i = 0;
+        break;
+      }
+      i += valeaten;
+      res.try_emplace(std::move(key), std::move(valobj));
+
+      skip_whitespace(i);
+
+      if (json[i] == ',') {
+        i += 1;
+      }
+    }
+  }
+
+  return {JSONObject{std::monostate{}}, 0};
 }
 
 template <class T> std::optional<T> try_parse_num(std::string_view str) {
