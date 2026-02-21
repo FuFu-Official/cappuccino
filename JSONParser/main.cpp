@@ -10,18 +10,29 @@
 #include <variant>
 #include <vector>
 
+struct JSONObject;
+
+using JSONDICT = std::unordered_map<std::string, JSONObject>;
+using JSONLIST = std::vector<JSONObject>;
+
 struct JSONObject {
-  std::variant<std::monostate,                             // none
-               bool,                                       // true & false
-               int,                                        // 3
-               double,                                     // 3,14
-               std::string,                                // "hello"
-               std::vector<JSONObject>,                    // [true, 3]
-               std::unordered_map<std::string, JSONObject> // {"hello": 3}
+  std::variant<std::monostate, // none
+               bool,           // true & false
+               int,            // 3
+               double,         // 3,14
+               std::string,    // "hello"
+               JSONLIST,       // [true, 3]
+               JSONDICT        // {"hello": 3}
                >
       inner;
 
   void do_print() const { printnl(inner); }
+
+  template <class T> bool is() { return std::holds_alternative<T>(inner); }
+
+  template <class T> T const &get() const { return std::get<T>(inner); }
+
+  template <class T> T &get() { return std::get<T>(inner); }
 };
 
 char unescaped_char(char c);
@@ -31,8 +42,22 @@ template <class T> std::optional<T> try_parse_num(std::string_view str);
 std::pair<JSONObject, size_t> parse(std::string_view json);
 
 int main() {
-  std::string_view str = R"JSON([1,[1,3,    "hellp"          ],5])JSON";
-  print(parse(str).first);
+  std::string_view list_str = "[1, 2, 3, 4]";
+  print(parse(list_str).first);
+  std::string_view str =
+      R"JSON({
+        "hello":   123  
+        ,"fufu":[66, 11, "furi"]})JSON";
+  JSONObject obj = parse(str).first;
+  print(obj);
+
+  JSONDICT dict = obj.get<JSONDICT>();
+
+  auto visit_value = [](auto const &value) { print(value); };
+
+  auto const &hello_val = dict.at("hello");
+  std::visit(visit_value, hello_val.inner);
+
   return 0;
 }
 
@@ -40,6 +65,13 @@ std::pair<JSONObject, size_t> parse(std::string_view json) {
   // Parse none
   if (json.empty()) {
     return {JSONObject{std::monostate{}}, 0};
+  }
+
+  // Exclude leading escape characters
+  if (size_t off = json.find_first_not_of(" \n\r\t\v\f\0");
+      off != 0 && off != json.npos) {
+    auto [obj, eaten] = parse(json.substr(off));
+    return {std::move(obj), eaten + off};
   }
 
   // Parse int & double
@@ -140,9 +172,13 @@ std::pair<JSONObject, size_t> parse(std::string_view json) {
         i = 0;
         break;
       }
+
+      skip_whitespace(i);
       if (json[i] == ':') {
         i += 1;
       }
+      skip_whitespace(i);
+
       std::string key = std::move(std::get<std::string>(keyobj.inner));
       auto [valobj, valeaten] = parse(json.substr(i));
       if (valeaten == 0) {
@@ -153,11 +189,12 @@ std::pair<JSONObject, size_t> parse(std::string_view json) {
       res.try_emplace(std::move(key), std::move(valobj));
 
       skip_whitespace(i);
-
       if (json[i] == ',') {
         i += 1;
       }
+      skip_whitespace(i);
     }
+    return {JSONObject{std::move(res)}, i};
   }
 
   return {JSONObject{std::monostate{}}, 0};
