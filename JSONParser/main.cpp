@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -53,10 +54,18 @@ int main() {
 
   JSONDICT dict = obj.get<JSONDICT>();
 
-  auto visit_value = [](auto const &value) { print(value); };
+  auto visit_value = [](auto const &value) {
+    if constexpr (std::is_same_v<std::decay_t<decltype(value)>, JSONLIST>) {
+      for (auto const &subvalue : value) {
+        print(subvalue);
+      }
+    } else {
+      print(value);
+    }
+  };
 
-  auto const &hello_val = dict.at("hello");
-  std::visit(visit_value, hello_val.inner);
+  auto const &som_val = dict.at("fufu");
+  std::visit(visit_value, som_val.inner);
 
   return 0;
 }
