@@ -6,4 +6,5 @@
 !*.hpp
 !*.md
 !*.txt
+!*.json
 !.gitignore
