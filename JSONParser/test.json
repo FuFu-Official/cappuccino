@@ -1,7 +1,9 @@
 {
   "hello": "world",
-  "fufu": [11, 66, [3.14, 9.1]],
+  "fufu": [11, 66, [3.14, 9.1, null]],
+  "fu": true,
+  "f": false,
   "furi": {
-    "sub": "val"
+    "key": "val"
   }
 }

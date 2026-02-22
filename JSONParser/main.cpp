@@ -87,7 +87,23 @@ std::pair<JSONObject, size_t> parse(std::string_view json) {
     return {std::move(obj), eaten + off};
   }
 
-  // TODO: Parse null
+  if (json.size() >= 4) {
+    // Parse null
+    if (json.substr(0, 4) == "null") {
+      return {JSONObject{std::nullptr_t{}}, 4};
+    }
+
+    // Parse bool
+    if (json.substr(0, 4) == "true") {
+      return {JSONObject{true}, 4};
+    }
+  }
+
+  if (json.size() >= 5) {
+    if (json.substr(0, 5) == "false") {
+      return {JSONObject{false}, 5};
+    }
+  }
 
   // Parse int & double
   if (char ch = json[0]; (ch >= '0' && ch <= '9') || ch == '+' || ch == '-') {
