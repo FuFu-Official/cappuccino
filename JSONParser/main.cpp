@@ -1,11 +1,14 @@
+#include "CLI11.hpp"
 #include "print.hpp"
 #include <charconv>
 #include <cstddef>
+#include <filesystem>
+#include <iostream>
+#include <optional>
 #include <regex>
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -17,7 +20,7 @@ using JSONDICT = std::unordered_map<std::string, JSONObject>;
 using JSONLIST = std::vector<JSONObject>;
 
 struct JSONObject {
-  std::variant<std::monostate, // none
+  std::variant<std::nullptr_t, // none
                bool,           // true & false
                int,            // 3
                double,         // 3,14
@@ -42,38 +45,39 @@ template <class T> std::optional<T> try_parse_num(std::string_view str);
 
 std::pair<JSONObject, size_t> parse(std::string_view json);
 
-int main() {
-  std::string_view list_str = "[1, 2, 3, 4]";
-  print(parse(list_str).first);
-  std::string_view str =
-      R"JSON({
-        "hello":   123  
-        ,"fufu":[66, 11, "furi"]})JSON";
-  JSONObject obj = parse(str).first;
+int main(int argc, char **argv) {
+  CLI::App app{"a simple JSON parser"};
+
+  std::string path;
+
+  app.add_option("filepath", path, "JSON file to parse")->type_name("");
+
+  CLI11_PARSE(app, argc, argv);
+
+  std::filesystem::path fs(path);
+
+  if (!std::filesystem::exists(fs)) {
+    std::cerr << "Invalid path.";
+    return -1;
+  }
+
+  std::ifstream infile(path);
+  std::string raw_json;
+  if (infile) {
+    raw_json.assign((std::istreambuf_iterator<char>(infile)),
+                    std::istreambuf_iterator<char>());
+  }
+
+  JSONObject obj = parse(raw_json).first;
   print(obj);
-
-  JSONDICT dict = obj.get<JSONDICT>();
-
-  auto visit_value = [](auto const &value) {
-    if constexpr (std::is_same_v<std::decay_t<decltype(value)>, JSONLIST>) {
-      for (auto const &subvalue : value) {
-        print(subvalue);
-      }
-    } else {
-      print(value);
-    }
-  };
-
-  auto const &som_val = dict.at("fufu");
-  std::visit(visit_value, som_val.inner);
 
   return 0;
 }
 
 std::pair<JSONObject, size_t> parse(std::string_view json) {
-  // Parse none
+  // Parse empty
   if (json.empty()) {
-    return {JSONObject{std::monostate{}}, 0};
+    return {JSONObject{std::nullptr_t{}}, 0};
   }
 
   // Exclude leading escape characters
@@ -82,6 +86,8 @@ std::pair<JSONObject, size_t> parse(std::string_view json) {
     auto [obj, eaten] = parse(json.substr(off));
     return {std::move(obj), eaten + off};
   }
+
+  // TODO: Parse null
 
   // Parse int & double
   if (char ch = json[0]; (ch >= '0' && ch <= '9') || ch == '+' || ch == '-') {
@@ -206,7 +212,7 @@ std::pair<JSONObject, size_t> parse(std::string_view json) {
     return {JSONObject{std::move(res)}, i};
   }
 
-  return {JSONObject{std::monostate{}}, 0};
+  return {JSONObject{std::nullptr_t{}}, 0};
 }
 
 template <class T> std::optional<T> try_parse_num(std::string_view str) {
