@@ -20,3 +20,6 @@ int main() {
   auto f2 = [](int &i) { i *= i; };
   v | f2 | f;
 }
+
+// Output:
+// 1 4 9
